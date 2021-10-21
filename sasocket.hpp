@@ -36,57 +36,57 @@ class SASocket {
                 // 处理dns
                 snprintf(strPort, sizeof(strPort), "%d", port);
                 if ( 0 != getaddrinfo( strHost.c_str(), strPort, &hints, &pAddrList ) ) {
-                    std::printf("error : %s", strerror(errno));
+                    logW("error : %s", strerror(errno));
                     throw Error::kDnsSolveFailure;
                 }
                 // 创建socket
                 m_iSocket = socket(pAddrList->ai_family, pAddrList->ai_socktype, pAddrList->ai_protocol);
                 if( m_iSocket < 0 ) {
-                    std::printf("error : %s", strerror(errno));
+                    logW("error : %s", strerror(errno));
                     throw Error::kSocketCreateFailure;
                 }
 
                 if( m_bServer ) {
                     if( 0 != bind( m_iSocket, pAddrList->ai_addr, (int)pAddrList->ai_addrlen) ) {
-                        std::printf("error : %s", strerror(errno));
+                        logW("error : %s", strerror(errno));
                         throw Error::kBindFailure;
                     }
 
                     if( 0 != listen( m_iSocket, 32) ) {
-                        std::printf("error : %s", strerror(errno));
+                        logW("error : %s", strerror(errno));
                         throw Error::kListenFailure;
                     }
                 }
                 else {
                     // 尝试建立链接
                     if ( 0 != connect( m_iSocket, pAddrList->ai_addr, (int)pAddrList->ai_addrlen ) ) {
-                        std::printf("error : %s", strerror(errno));
+                        logW("error : %s", strerror(errno));
                         throw Error::kConnectFailure;
                     }
                 }
             }
             catch(Error error) {
                 switch(error) {
-                    case Error::kDnsSolveFailure: 
-                        SALog::logW("dns resolve failure", __func__, __LINE__);
+                    case Error::kDnsSolveFailure:
+                        logW("dns resolve failure");
                     break;
                     case Error::kSocketCreateFailure: 
-                        SALog::logW("socket create failure", __func__, __LINE__);
+                        logW("socket create failure");
                     break;
                     case Error::kConnectFailure: 
-                        SALog::logW("connect failure", __func__, __LINE__);
+                        logW("connect failure");
                     break;
                     case Error::kBindFailure: 
-                        SALog::logW("bind server failure", __func__, __LINE__);
+                        logW("bind server failure");
                     break;
                     case Error::kListenFailure:
-                        SALog::logW("listen server failure", __func__, __LINE__);          
+                        logW("listen server failure");          
                     break;
                 }
                 return false;
             }
             catch(...) {
-                SALog::logW("Not catch", __func__, __LINE__);
+                logW("Not catch");
                 std::terminate();
             }
 
@@ -96,23 +96,38 @@ class SASocket {
         }
 
         bool Close() {
-            if( m_iSocket >= 0 )
+            if( m_iSocket >= 0 ) {
                 close(m_iSocket);
+                // shutdown(m_iSocket, SHUT_RDWR);
+            }
             m_iSocket = -1;
+            return true;
+        }
+
+        bool Send(const char *data, std::size_t nLen ) {
+            struct timeval tv;
+            tv.tv_sec  = 0;
+            tv.tv_usec = 200000;
+            setsockopt(m_iSocket, SOL_SOCKET, SO_SNDTIMEO, (struct timeval*)&tv, sizeof(tv));
+            send(m_iSocket, data, nLen, MSG_WAITALL);
+            fsync(m_iSocket);
             return true;
         }
 
         bool Send(const std::string &data ) {
             struct timeval tv;
-            tv.tv_sec  = 3;
-            tv.tv_usec = 0;
+            tv.tv_sec  = 0;
+            tv.tv_usec = 200000;
             setsockopt(m_iSocket, SOL_SOCKET, SO_SNDTIMEO, (struct timeval*)&tv, sizeof(tv));
-            std::cout << "Data: " <<data << std::endl;
             send(m_iSocket, data.c_str(), data.size(), MSG_WAITALL);
+            fsync(m_iSocket);
             return true;
         }
 
         std::unique_ptr<std::string> Recv(size_t nLen) {
+            if( m_iSocket < 0 )
+                return nullptr;
+    
             struct timeval tv;
             tv.tv_sec  = 3;
             tv.tv_usec = 0;
@@ -121,14 +136,14 @@ class SASocket {
             std::shared_ptr<char> l_strRecv(new char[nLen + 1], std::default_delete<char[]>());
             ssize_t ret = recv(m_iSocket, l_strRecv.get(), nLen, MSG_WAITALL);
             if( !ret ) {
-                SALog::logD("recv over", __func__, __LINE__);
+                logD("recv over");
                 return nullptr;
             }
             else if( ret < 0 ) {
-                SALog::logD(strerror(errno), __func__, __LINE__);
+                logD("error : %s", strerror(errno));
                 ret = 0;
             }
-            return libsa::make_unique<std::string>(l_strRecv.get(), ret);
+            return make_unique<std::string>(l_strRecv.get(), ret);
         }
     private:
         SASocket(const SASocket & ) = delete;

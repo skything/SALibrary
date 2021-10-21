@@ -1,28 +1,22 @@
 #ifndef __SALOG_CXX_HPP__
 #define __SALOG_CXX_HPP__
 
-#include <iostream>
-#include <string>
+#include <cstdio>
 
-namespace libsa {
-class SALog {
-    public:
-        SALog()  = delete;
-        ~SALog() = delete;
+#ifndef SA_ASSERT
+#define SA_ASSERT( param, notice )                                           \
+    do{                                                                      \
+        if( !(param) ) {                                                     \
+            fputs("SA_ASSERT failure : " #param " -> " notice "\n", stderr); \
+            fflush(NULL);                                                    \
+            abort();                                                         \
+        }                                                                    \
+    }while(0)
+#endif
 
-        static inline void logD(const char *strInfo, const char* strFunc = __func__, int line = __LINE__) {
-            std::cout << "[SA][D] " << strInfo << " in [" << strFunc << "][" << line <<"]" << std::endl;
-        }
-
-        static inline void logW(const char *strInfo, const char* strFunc = __func__, int line = __LINE__) {
-            std::cout << "[SA][W] " << strInfo << " in [" << strFunc << "][" << line <<"]" << std::endl;
-        }
-
-        static inline void logE(const char *strInfo, const char* strFunc = __func__, int line = __LINE__) {
-            std::cout << "[SA][E] " << strInfo << " in [" << strFunc << "][" << line <<"]" << std::endl;
-        }
-};
-};
-
+#define PRINT_ARGS __func__, __FILE__, __LINE__
+#define logD(fmt, args...) do{printf("[SA][D] " fmt "  [%s] in [%s:%d]\n", ##args, PRINT_ARGS);fflush(NULL);}while(0)
+#define logW(fmt, args...) do{printf("[SA][W] " fmt "  [%s] in [%s:%d]\n", ##args, PRINT_ARGS);fflush(NULL);}while(0)
+#define logE(fmt, args...) do{printf("[SA][E] " fmt "  [%s] in [%s:%d]\n", ##args, PRINT_ARGS);fflush(NULL);}while(0)
 
 #endif /* __SALOG_CXX_HPP__ */
